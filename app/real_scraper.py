@@ -394,13 +394,23 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
         update_progress(0.20, "Entering Google email")
         sign_in_page.wait_for_selector("input[name='identifier']", timeout=15000)
         sign_in_page.fill("input[name='identifier']", email)
-        sign_in_page.keyboard.press("Enter")
-        sign_in_page.wait_for_timeout(2000)
 
-        update_progress(0.28, "Waiting for school login")
+        # Prefer clicking Next instead of just pressing Enter
+        try:
+            if sign_in_page.locator("#identifierNext").count() > 0:
+                sign_in_page.locator("#identifierNext").click()
+            else:
+                sign_in_page.keyboard.press("Enter")
+        except Exception:
+            sign_in_page.keyboard.press("Enter")
+
+        sign_in_page.wait_for_timeout(3000)
+
+        update_progress(0.28, "Detecting login flow")
         sign_in_page.set_default_timeout(15000)
         student_number = email.split("@")[0]
 
+        google_password_selector = None
         username_selector = None
         password_selector = None
 
@@ -414,6 +424,25 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
             except Exception:
                 pass
 
+            # Google password page
+            google_password_candidates = [
+                'input[type="password"]',
+                'input[name="Passwd"]'
+            ]
+
+            for sel in google_password_candidates:
+                try:
+                    if sign_in_page.locator(sel).count() > 0:
+                        google_password_selector = sel
+                        log.info(f"Found Google password field: {sel}")
+                        break
+                except Exception:
+                    pass
+
+            if google_password_selector:
+                break
+
+            # School/YRDSB login page
             possible_usernames = [
                 "#UserName",
                 'input[name="UserName"]',
@@ -430,7 +459,7 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
                 try:
                     if sign_in_page.locator(sel).count() > 0:
                         username_selector = sel
-                        log.info(f"Found username field: {sel}")
+                        log.info(f"Found school username field: {sel}")
                         break
                 except Exception:
                     pass
@@ -439,7 +468,7 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
                 try:
                     if sign_in_page.locator(sel).count() > 0:
                         password_selector = sel
-                        log.info(f"Found password field: {sel}")
+                        log.info(f"Found school password field: {sel}")
                         break
                 except Exception:
                     pass
@@ -447,10 +476,36 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
             if username_selector and password_selector:
                 break
 
-        if not username_selector or not password_selector:
+            # Try clicking Next again if still stuck on Google identifier page
             try:
-                sign_in_page.screenshot(path="/tmp/yrdsb_login_debug.png", full_page=True)
-                log.info("Saved screenshot to /tmp/yrdsb_login_debug.png")
+                if "accounts.google.com" in sign_in_page.url and sign_in_page.locator("#identifierNext").count() > 0:
+                    log.info("Still on Google identifier page, clicking Next again")
+                    sign_in_page.locator("#identifierNext").click()
+            except Exception:
+                pass
+
+        if google_password_selector:
+            update_progress(0.35, "Entering Google password")
+            sign_in_page.fill(google_password_selector, password)
+
+            try:
+                if sign_in_page.locator("#passwordNext").count() > 0:
+                    sign_in_page.locator("#passwordNext").click()
+                else:
+                    sign_in_page.keyboard.press("Enter")
+            except Exception:
+                sign_in_page.keyboard.press("Enter")
+
+        elif username_selector and password_selector:
+            update_progress(0.35, "Entering school credentials")
+            sign_in_page.fill(username_selector, student_number)
+            sign_in_page.fill(password_selector, password)
+            sign_in_page.keyboard.press("Enter")
+
+        else:
+            try:
+                sign_in_page.screenshot(path="/tmp/login_debug.png", full_page=True)
+                log.info("Saved screenshot to /tmp/login_debug.png")
             except Exception as e:
                 log.info(f"Could not save screenshot: {e}")
 
@@ -460,15 +515,10 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
             except Exception as e:
                 log.info(f"Could not dump login page html: {e}")
 
-            raise Exception(f"YRDSB login fields did not appear. Final URL: {sign_in_page.url}")
-
-        update_progress(0.35, "Entering school credentials")
-        sign_in_page.fill(username_selector, student_number)
-        sign_in_page.fill(password_selector, password)
-        sign_in_page.keyboard.press("Enter")
+            raise Exception(f"Could not detect Google or school login fields. Final URL: {sign_in_page.url}")
 
         update_progress(0.45, "Waiting for Google Classroom")
-        sign_in_page.wait_for_url("**/classroom.google.com/**", timeout=40000)
+        sign_in_page.wait_for_url("**/classroom.google.com/**", timeout=60000)
         sign_in_page.wait_for_timeout(5000)
 
         main_page = sign_in_page
