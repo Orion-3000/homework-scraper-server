@@ -426,16 +426,21 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
 
             # Google password page
             google_password_candidates = [
-                'input[type="password"]',
-                'input[name="Passwd"]'
+                'input[name="Passwd"]',
+                'input[type="password"]:not([aria-hidden="true"])'
             ]
 
             for sel in google_password_candidates:
                 try:
-                    if sign_in_page.locator(sel).count() > 0:
-                        google_password_selector = sel
-                        log.info(f"Found Google password field: {sel}")
-                        break
+                    locator = sign_in_page.locator(sel).first
+                    if locator.count() > 0:
+                        try:
+                            if locator.is_visible():
+                                google_password_selector = sel
+                                log.info(f"Found visible Google password field: {sel}")
+                                break
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 
@@ -486,7 +491,18 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
 
         if google_password_selector:
             update_progress(0.35, "Entering Google password")
-            sign_in_page.fill(google_password_selector, password)
+
+            password_locator = sign_in_page.locator(google_password_selector).first
+
+            try:
+                password_locator.wait_for(state="visible", timeout=15000)
+            except Exception:
+                # fallback: try the specific Google password field directly
+                password_locator = sign_in_page.locator('input[name="Passwd"]').first
+                password_locator.wait_for(state="visible", timeout=15000)
+
+            password_locator.click()
+            password_locator.fill(password)
 
             try:
                 if sign_in_page.locator("#passwordNext").count() > 0:
