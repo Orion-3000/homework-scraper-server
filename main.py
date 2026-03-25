@@ -374,6 +374,37 @@ def apply_sheet_formatting(sheet, num_rows):
     sheet.spreadsheet.batch_update(body)
 
 
+def submit_google_email(sign_in_page, email: str):
+    email_locator = sign_in_page.locator('input[name="identifier"]').first
+    email_locator.wait_for(state="visible", timeout=15000)
+    email_locator.click()
+    email_locator.fill("")
+    email_locator.fill(email)
+
+    try:
+        entered_value = email_locator.input_value()
+        log.info(f"Email field value after fill: {entered_value}")
+    except Exception:
+        pass
+
+    sign_in_page.wait_for_timeout(1000)
+
+    try:
+        identifier_next = sign_in_page.locator("#identifierNext").first
+        identifier_next.wait_for(state="visible", timeout=10000)
+        identifier_next.click()
+    except Exception:
+        sign_in_page.keyboard.press("Enter")
+
+    sign_in_page.wait_for_timeout(4000)
+
+    try:
+        log.info(f"After email submit URL: {sign_in_page.url}")
+        log.info(f"After email submit title: {sign_in_page.title()}")
+    except Exception:
+        pass
+
+
 def run_scraper(email: str, password: str, sheet_link: str, progress_callback=None):
     sheet_id = extract_sheet_id(sheet_link)
     student_number = extract_student_number(email)
@@ -434,35 +465,12 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
                 sign_in_page.wait_for_timeout(2000)
 
         update_progress(0.20, "Entering Google email")
+        submit_google_email(sign_in_page, email)
 
-        email_locator = sign_in_page.locator('input[name="identifier"]').first
-        email_locator.wait_for(state="visible", timeout=15000)
-        email_locator.click()
-        email_locator.fill("")
-        email_locator.fill(email)
-
-        try:
-            entered_value = email_locator.input_value()
-            log.info(f"Email field value after fill: {entered_value}")
-        except Exception:
-            pass
-
-        sign_in_page.wait_for_timeout(1000)
-
-        try:
-            identifier_next = sign_in_page.locator("#identifierNext").first
-            identifier_next.wait_for(state="visible", timeout=10000)
-            identifier_next.click()
-        except Exception:
-            sign_in_page.keyboard.press("Enter")
-
-        sign_in_page.wait_for_timeout(4000)
-
-        try:
-            log.info(f"After email submit URL: {sign_in_page.url}")
-            log.info(f"After email submit title: {sign_in_page.title()}")
-        except Exception:
-            pass
+        # If still stuck on the Google identifier page, try the email again once
+        if "accounts.google.com/v3/signin/identifier" in sign_in_page.url:
+            log.info("Still on Google identifier page, retrying full email once")
+            submit_google_email(sign_in_page, email)
 
         update_progress(0.28, "Detecting login flow")
 
