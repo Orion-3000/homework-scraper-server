@@ -451,30 +451,40 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
             possible_usernames = [
                 "#UserName",
                 'input[name="UserName"]',
-                'input[type="text"]',
-                'input[type="email"]'
+                'input[type="text"]:not([aria-hidden="true"])',
+                'input[type="email"]:not([aria-hidden="true"])'
             ]
             possible_passwords = [
                 "#Password",
                 'input[name="Password"]',
-                'input[type="password"]'
+                'input[type="password"]:not([aria-hidden="true"])'
             ]
 
             for sel in possible_usernames:
                 try:
-                    if sign_in_page.locator(sel).count() > 0:
-                        username_selector = sel
-                        log.info(f"Found school username field: {sel}")
-                        break
+                    locator = sign_in_page.locator(sel).first
+                    if locator.count() > 0:
+                        try:
+                            if locator.is_visible():
+                                username_selector = sel
+                                log.info(f"Found visible school username field: {sel}")
+                                break
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 
             for sel in possible_passwords:
                 try:
-                    if sign_in_page.locator(sel).count() > 0:
-                        password_selector = sel
-                        log.info(f"Found school password field: {sel}")
-                        break
+                    locator = sign_in_page.locator(sel).first
+                    if locator.count() > 0:
+                        try:
+                            if locator.is_visible():
+                                password_selector = sel
+                                log.info(f"Found visible school password field: {sel}")
+                                break
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 
@@ -513,9 +523,21 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
                 sign_in_page.keyboard.press("Enter")
 
         elif username_selector and password_selector:
+            log.info(f"Using school selectors: username={username_selector}, password={password_selector}")
             update_progress(0.35, "Entering school credentials")
-            sign_in_page.fill(username_selector, student_number)
-            sign_in_page.fill(password_selector, password)
+
+            username_locator = sign_in_page.locator(username_selector).first
+            password_locator = sign_in_page.locator(password_selector).first
+
+            username_locator.wait_for(state="visible", timeout=15000)
+            password_locator.wait_for(state="visible", timeout=15000)
+
+            username_locator.click()
+            username_locator.fill(student_number)
+
+            password_locator.click()
+            password_locator.fill(password)
+
             sign_in_page.keyboard.press("Enter")
 
         else:
