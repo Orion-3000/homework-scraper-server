@@ -501,13 +501,10 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
             possible_usernames = [
                 "#UserName",
                 'input[name="UserName"]',
-                'input[type="text"]:not([aria-hidden="true"])',
-                'input[type="email"]:not([aria-hidden="true"])'
             ]
             possible_passwords = [
                 "#Password",
                 'input[name="Password"]',
-                'input[type="password"]:not([aria-hidden="true"])'
             ]
 
             for sel in possible_usernames:
@@ -562,20 +559,32 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
             )
             update_progress(0.35, "Entering school credentials")
 
-            username_locator = sign_in_page.locator(username_selector).first
-            password_locator = sign_in_page.locator(password_selector).first
+            # Force the exact YRDSB fields first
+            try:
+                username_locator = sign_in_page.locator("#UserName").first
+                username_locator.wait_for(state="visible", timeout=5000)
+            except Exception:
+                username_locator = sign_in_page.locator('input[name="UserName"]').first
+                username_locator.wait_for(state="visible", timeout=15000)
 
-            username_locator.wait_for(state="visible", timeout=15000)
-            password_locator.wait_for(state="visible", timeout=15000)
+            try:
+                password_locator = sign_in_page.locator("#Password").first
+                password_locator.wait_for(state="visible", timeout=5000)
+            except Exception:
+                password_locator = sign_in_page.locator('input[name="Password"]').first
+                password_locator.wait_for(state="visible", timeout=15000)
 
             username_locator.click()
             username_locator.fill("")
-            username_locator.fill(student_number)
+            username_locator.type(student_number, delay=80)
+
+            sign_in_page.wait_for_timeout(500)
 
             password_locator.click()
             password_locator.fill("")
-            password_locator.fill(password)
+            password_locator.type(password, delay=80)
 
+            sign_in_page.wait_for_timeout(500)
             sign_in_page.keyboard.press("Enter")
 
         else:
