@@ -335,7 +335,7 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
 
     with sync_playwright() as p:
         update_progress(0.05, "Launching browser")
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         context = browser.new_context()
 
         def route_handler(route):
