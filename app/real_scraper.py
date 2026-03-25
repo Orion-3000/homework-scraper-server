@@ -398,21 +398,39 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
         sign_in_page.wait_for_timeout(2000)
 
         update_progress(0.28, "Waiting for school login")
+        sign_in_page.set_default_timeout(15000)
         student_number = email.split("@")[0]
 
         username_selector = None
         password_selector = None
 
-        for _ in range(10):
+        for attempt in range(15):
             sign_in_page.wait_for_timeout(2000)
 
-            possible_usernames = ["#UserName", 'input[name="UserName"]', 'input[type="text"]']
-            possible_passwords = ["#Password", 'input[name="Password"]', 'input[type="password"]']
+            try:
+                log.info(f"[login wait] attempt {attempt + 1}")
+                log.info(f"[login wait] current url: {sign_in_page.url}")
+                log.info(f"[login wait] title: {sign_in_page.title()}")
+            except Exception:
+                pass
+
+            possible_usernames = [
+                "#UserName",
+                'input[name="UserName"]',
+                'input[type="text"]',
+                'input[type="email"]'
+            ]
+            possible_passwords = [
+                "#Password",
+                'input[name="Password"]',
+                'input[type="password"]'
+            ]
 
             for sel in possible_usernames:
                 try:
                     if sign_in_page.locator(sel).count() > 0:
                         username_selector = sel
+                        log.info(f"Found username field: {sel}")
                         break
                 except Exception:
                     pass
@@ -421,6 +439,7 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
                 try:
                     if sign_in_page.locator(sel).count() > 0:
                         password_selector = sel
+                        log.info(f"Found password field: {sel}")
                         break
                 except Exception:
                     pass
@@ -429,7 +448,19 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
                 break
 
         if not username_selector or not password_selector:
-            raise Exception("YRDSB login fields did not appear")
+            try:
+                sign_in_page.screenshot(path="/tmp/yrdsb_login_debug.png", full_page=True)
+                log.info("Saved screenshot to /tmp/yrdsb_login_debug.png")
+            except Exception as e:
+                log.info(f"Could not save screenshot: {e}")
+
+            try:
+                html = sign_in_page.content()
+                log.info(f"Login page html preview: {html[:3000]}")
+            except Exception as e:
+                log.info(f"Could not dump login page html: {e}")
+
+            raise Exception(f"YRDSB login fields did not appear. Final URL: {sign_in_page.url}")
 
         update_progress(0.35, "Entering school credentials")
         sign_in_page.fill(username_selector, student_number)
