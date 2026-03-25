@@ -392,19 +392,37 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
         sign_in_page.wait_for_timeout(1500)
 
         update_progress(0.20, "Entering Google email")
-        sign_in_page.wait_for_selector("input[name='identifier']", timeout=15000)
-        sign_in_page.fill("input[name='identifier']", email)
 
-        # Prefer clicking Next instead of just pressing Enter
+        email_locator = sign_in_page.locator('input[name="identifier"]').first
+        email_locator.wait_for(state="visible", timeout=15000)
+        email_locator.click()
+        email_locator.fill("")
+        email_locator.fill(email)
+
         try:
-            if sign_in_page.locator("#identifierNext").count() > 0:
-                sign_in_page.locator("#identifierNext").click()
-            else:
-                sign_in_page.keyboard.press("Enter")
+            entered_value = email_locator.input_value()
+            log.info(f"Email field value after fill: {entered_value}")
+        except Exception:
+            pass
+
+        sign_in_page.wait_for_timeout(1000)
+
+        # Prefer clicking the real Next button
+        identifier_next = sign_in_page.locator("#identifierNext").first
+
+        try:
+            identifier_next.wait_for(state="visible", timeout=10000)
+            identifier_next.click()
         except Exception:
             sign_in_page.keyboard.press("Enter")
 
-        sign_in_page.wait_for_timeout(3000)
+        sign_in_page.wait_for_timeout(4000)
+
+        try:
+            log.info(f"After email submit URL: {sign_in_page.url}")
+            log.info(f"After email submit title: {sign_in_page.title()}")
+        except Exception:
+            pass
 
         update_progress(0.28, "Detecting login flow")
         sign_in_page.set_default_timeout(15000)
@@ -549,9 +567,15 @@ def run_scraper(email: str, password: str, sheet_link: str, progress_callback=No
 
             try:
                 html = sign_in_page.content()
-                log.info(f"Login page html preview: {html[:3000]}")
+                log.info(f"Login page html preview: {html[:5000]}")
             except Exception as e:
                 log.info(f"Could not dump login page html: {e}")
+
+            try:
+                possible_text = sign_in_page.locator("body").inner_text()
+                log.info(f"Login page text preview: {possible_text[:2000]}")
+            except Exception as e:
+                log.info(f"Could not dump login page text: {e}")
 
             raise Exception(f"Could not detect Google or school login fields. Final URL: {sign_in_page.url}")
 
